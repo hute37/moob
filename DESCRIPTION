@@ -1,0 +1,19 @@
+Package: moob
+Type: Package
+Title: Simple R Scratchpad
+Version: 0.1.0
+Date: 2016-09-13
+Authors@R: person("Giovanni", "Pelosi", role=c("aut", "cre"), email = "hute37@gmail.com")
+Description: Simple code demo samples and gists.
+    Free code grabbend somewhere.
+License: GPL-3
+LazyData: TRUE
+Suggests:
+    testthat,
+    knitr,
+    rmarkdown
+VignetteBuilder: knitr
+RoxygenNote: 5.0.1
+Imports:
+    methods,
+    magrittr
