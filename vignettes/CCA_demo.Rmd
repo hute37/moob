@@ -1,0 +1,260 @@
+---
+title: "CCA_demo"
+author: "Vignette Author"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Vignette Title}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,fig.width=12, fig.height=10)
+```
+
+# Canonical Correlation Analysis
+
+* http://www.ats.ucla.edu/stat/r/dae/canonical.htm
+
+## imports
+
+
+```{r libs}
+
+require(ggplot2)
+require(GGally)
+require(CCA)
+
+```
+
+
+
+```{r local}
+
+require(moob)
+
+x <- moob::hello()
+
+```
+
+
+## Description of the data
+
+For our analysis example, we are going to expand example 1 about investigating the associations between psychological measures and academic achievement measures.
+
+We have a data file, mmreg.dta, with 600 observations on eight variables. The psychological variables are locus_of_control, self_concept and motivation. The academic variables are standardized tests in reading (read), writing (write), math (math) and science (science). Additionally, the variable female is a zero-one indicator variable with the one indicating a female student.
+
+
+```{r data}
+
+mm <- read.csv("http://www.ats.ucla.edu/stat/data/mmreg.csv")
+colnames(mm) <- c("Control", "Concept", "Motivation", "Read", "Write", "Math", 
+    "Science", "Sex")
+summary(mm)
+
+
+```
+
+
+
+## Analysis methods you might consider
+
+Below is a list of some analysis methods you may have encountered. Some of the methods listed are quite reasonable while others have either fallen out of favor or have limitations.
+
+* Canonical correlation analysis, the focus of this page.
+* Separate OLS Regressions - You could analyze these data using separate OLS regression analyses for each variable in one set. The OLS regressions will not produce multivariate results and does not report information concerning dimensionality.
+* Multivariate multiple regression is a reasonable option if you have no interest in dimensionality.
+
+## Canonical correlation analysis
+
+Below we use the canon command to conduct a canonical correlation analysis. It requires two sets of variables enclosed with a pair of parentheses. We specify our psychological variables as the first set of variables and our academic variables plus gender as the second set. For convenience, the variables in the first set are called "u" variables and the variables in the second set are called "v" variables.  
+
+Let's look at the data.
+
+
+```{r}
+xtabs(~Sex, data = mm)
+```
+
+
+```{r}
+
+psych <- mm[, 1:3]
+acad <- mm[, 4:8]
+
+```
+
+```{r}
+ggpairs(psych)
+
+```
+
+```{r}
+ggpairs(acad)
+```
+
+
+Next, we'll look at the correlations within and between the two sets of variables using the matcor function from the CCA package.
+
+```{r}
+# correlations
+matcor(psych, acad)
+```
+
+
+
+# Some Strategies You Might Be Tempted To Try
+
+Before we show how you can analyze this with a canonical correlation analysis, let's consider some other methods that you might use.
+
+* Separate OLS Regressions - You could analyze these data using separate OLS regression analyses for each variable in one set. The OLS regressions will not produce multivariate results and does not report information concerning dimensionality.
+* Multivariate multiple regression is a reasonable option if you have no interest in dimensionality.
+
+## R Canonical Correlation Analysis
+
+Due to the length of the output, we will be making comments in several places along the way.
+
+```{r}
+cc1 <- cc(psych, acad)
+# display the canonical correlations
+cc1$cor
+```
+
+
+```{r}
+# raw canonical coefficients
+cc1[3:4]
+```
+
+
+The raw canonical coefficients are interpreted in a manner analogous to interpreting regression coefficients i.e., for the variable read, a one unit increase in reading leads to a .0446 decrease in the first canonical variate of set 2 when all of the other variables are held constant. Here is another example: being female leads to a .6321 decrease in the dimension 1 for the academic set with the other predictors held constant.
+
+Next, we'll use comput to compute the loadings of the variables on the canonical dimensions (variates). These loadings are correlations between variables and the canonical variates.
+
+
+```{r}
+# compute canonical loadings
+cc2 <- comput(psych, acad, cc1)
+
+# display canonical loadings
+cc2[3:6]
+```
+
+
+The above correlations are between observed variables and canonical variables which are known as the canonical loadings. These canonical variates are actually a type of latent variable.
+
+In general, the number of canonical dimensions is equal to the number of variables in the smaller set; however, the number of significant dimensions may be even smaller. Canonical dimensions, also known as canonical variates, are latent variables that are analogous to factors obtained in factor analysis. For this particular model there are three canonical dimensions of which only the first two are statistically significant. (Note: I was not able to find a way to have R automatically compute the tests of the canonical dimensions in any of the packages so I have included some R code below.)
+
+
+```{r}
+
+# tests of canonical dimensions
+ev <- (1 - cc1$cor^2)
+
+n <- dim(psych)[1]
+p <- length(psych)
+q <- length(acad)
+k <- min(p, q)
+m <- n - 3/2 - (p + q)/2
+
+w <- rev(cumprod(rev(ev)))
+
+# initialize
+d1 <- d2 <- f <- vector("numeric", k)
+
+for (i in 1:k) {
+    s <- sqrt((p^2 * q^2 - 4)/(p^2 + q^2 - 5))
+    si <- 1/s
+    d1[i] <- p * q
+    d2[i] <- m * s - p * q/2 + 1
+    r <- (1 - w[i]^si)/w[i]^si
+    f[i] <- r * d2[i]/d1[i]
+    p <- p - 1
+    q <- q - 1
+}
+
+pv <- pf(f, d1, d2, lower.tail = FALSE)
+(dmat <- cbind(WilksL = w, F = f, df1 = d1, df2 = d2, p = pv))
+
+
+```
+
+
+
+As shown in the table above, the first test of the canonical dimensions tests whether all three dimensions are significant (they are, F = 11.72), the next test tests whether dimensions 2 and 3 combined are significant (they are, F = 2.94). Finally, the last test tests whether dimension 3, by itself, is significant (it is not). Therefore dimensions 1 and 2 must each be significant while dimension three is not.
+
+When the variables in the model have very different standard deviations, the standardized coefficients allow for easier comparisons among the variables. Next, we'll compute the standardized canonical coefficients.
+
+
+```{r}
+
+# standardized psych canonical coefficients diagonal matrix of psych sd's
+s1 <- diag(sqrt(diag(cov(psych))))
+s1 %*% cc1$xcoef
+
+```
+
+
+
+```{r}
+
+# standardized acad canonical coefficients diagonal matrix of acad sd's
+s2 <- diag(sqrt(diag(cov(acad))))
+s2 %*% cc1$ycoef
+
+```
+
+
+
+
+The standardized canonical coefficients are interpreted in a manner analogous to interpreting standardized regression coefficients. For example, consider the variable read, a one standard deviation increase in reading leads to a 0.45 standard deviation decrease in the score on the first canonical variate for set 2 when the other variables in the model are held constant.
+Sample Write-Up of the Analysis
+
+There is a lot of variation in the write-ups of canonical correlation analyses. The write-up below is fairly minimal, including only the tests of dimensionality and the standardized coefficients.
+
+Table 1: Tests of Canonical Dimensions
+            Canonical  Mult.
+Dimension     Corr.      F    df1    df2      p
+    1         0.46     11.72   15   1634.7  0.0000
+    2         0.17      2.94    8   1186    0.0029
+    3         0.10      2.16    3    594    0.0911
+
+Table 2: Standardized Canonical Coefficients
+                            Dimension
+                           1         2
+Psychological Variables
+    locus of control    -0.84     -0.42
+    self-concept         0.25     -0.84
+    motivation          -0.43      0.69
+Academic Variables plus Gender
+    reading             -0.45     -0.05
+    writing             -0.35      0.41
+    math                -0.22      0.04
+    science             -0.05     -0.83
+    gender (female=1)   -0.32      0.54
+
+Tests of dimensionality for the canonical correlation analysis, as shown in Table 1, indicate that two of the three canonical dimensions are statistically significant at the .05 level. Dimension 1 had a canonical correlation of 0.46 between the sets of variables, while for dimension 2 the canonical correlation was much lower at 0.17.
+
+Table 2 presents the standardized canonical coefficients for the first two dimensions across both sets of variables. For the psychological variables, the first canonical dimension is most strongly influenced by locus of control (.84) and for the second dimension self-concept (-.84) and motivation (.69). For the academic variables plus gender, the first dimension was comprised of reading (.45), writing (.35) and gender (.32). For the second dimension writing (.41), science (-.83) and gender (.54) were the dominating variables.
+Cautions, Flies in the Ointment
+Multivatiate normal distribution assumptions are required for both sets of variables.
+Canonical correlation analysis is not recommended for small samples.
+
+See Also
+
+## R Documentation
+
+* CCA Package
+
+## References
+
+* Afifi, A, Clark, V and May, S. 2004. Computer-Aided Multivariate Analysis. 4th ed. Boca Raton, Fl: Chapman & Hall/CRC.
+
+## Including Plots
+
+You can also embed plots, for example:
+
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

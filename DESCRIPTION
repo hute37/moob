@@ -11,9 +11,13 @@ LazyData: TRUE
 Suggests:
     testthat,
     knitr,
-    rmarkdown
+    rmarkdown,
+    ggplot2,
+    GGally,
+    CCA
 VignetteBuilder: knitr
 RoxygenNote: 5.0.1
 Imports:
     methods,
     magrittr
+
